@@ -105,6 +105,7 @@ impl Zkp for ZkpServerI {
 
         let data = request.get_ref();
         let username = data.username.clone();
+        // We could say that y1 and y2 are the public keys of the user
         let y1 = BigInt::from_bytes_be(Sign::Plus, &data.y1);
         let y2 = BigInt::from_bytes_be(Sign::Plus, &data.y2);
 
@@ -121,39 +122,37 @@ impl Zkp for ZkpServerI {
     }
 
     async fn challenge(&self, request:Request<ChallengeRequest>) -> Result<Response<ChallengeResponse>,Status>{
-        println!("request={:?}",request);
- 
-        // Stores r1, r2
-        let data = request.get_ref();
+        println!("Received challenge request: {:?}", request);
 
+        let data = request.get_ref();
         let username = data.username.clone();
         let r1 = BigInt::from_bytes_be(Sign::Plus, &data.r1);
         let r2 = BigInt::from_bytes_be(Sign::Plus, &data.r2);
-
-        let c: BigInt = thread_rng().gen_bigint(256); // Challenge is a random number
-        // let c = BigInt::from_bytes_be(Sign::Plus, &data.c);
-
-
-
+    
+        let params = self.parameters.lock().await;
+    
+        // random challenge, generate big int in range of q 
+        let c: BigInt = thread_rng().gen_bigint_range(&BigInt::from(0), &params.as_ref().unwrap().q);
+    
         let challenge = Challenge {
             id: username.clone(),
             r1: r1.clone(),
             r2: r2.clone(),
             c: c.clone(),
         };
-        
+    
+        // Store the challenge
         {
             let mut challenges = self.challenges.lock().await;
             challenges.insert(username.clone(), challenge);
         }
-
+    
         let response = ChallengeResponse {
             c: c.to_bytes_be().1,
         };
-        
-        println!("response={:?}",response);
-        Ok(Response::new(response))
-
+    
+        println!("Sending challenge response: {:?}", response);
+        Ok(Response::new(response))    
     }
 
     async fn verify(&self, request:Request<SecretRequest>) -> Result<Response<SecretResponse>,Status>{
