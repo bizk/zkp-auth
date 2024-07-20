@@ -2,15 +2,18 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use futures::lock::Mutex;
+use tokio::sync::Mutex;
+
 use tonic::{transport::Server, Request, Response, Status};
 use zkp_auth::zkp_server::{Zkp, ZkpServer};
 use zkp_auth::{ParamsResponse, ParamsRequest, RegisterRequest, RegisterResponse, ChallengeRequest, ChallengeResponse, SecretRequest, SecretResponse};
-mod zkp_auth; 
+mod zkp_auth;
 use num_traits::{ToBytes};
+
 use rand::{thread_rng, Rng};
+
 use num_bigint::{BigInt, RandBigInt, Sign};
-//use num_bigint::{BigInt, Sign};
+use is_prime::*;
 
 
 #[derive(Clone)]
@@ -41,24 +44,59 @@ struct Parameters {
 pub struct ZkpServerI {
     users: Arc<Mutex<HashMap<String, User>>>,
     challenges: Arc<Mutex<HashMap<String, Challenge>>>,
+    parameters: Arc<Mutex<Option<Parameters>>>,
+}
+
+fn generate_safe_prime(bit_length: usize) -> BigInt {
+    let mut rng = thread_rng();
+    loop { // Iterates until a safe prime is found
+        let q = rng.gen_biguint((bit_length - 1).try_into().unwrap());
+        let p = &q * 2u32 + 1u32;
+        if is_prime(&q.to_string()) && is_prime(&p.to_string()) {
+            return p.into();
+        }
+    }
+}
+
+fn find_generator(p: &BigInt, q: &BigInt) -> BigInt {
+    let two_big_int = BigInt::from(2);
+    loop {
+        // Find a g between 2 and p
+        let g = thread_rng().gen_bigint_range(&two_big_int, p);
+        // g = 2^((p-1)/q) mod p
+        // We don't want the generator to be of level 1 or 2, but to be q or 2q  so it generates the sub group q. hardening the security
+        if g.modpow(&((p - 1) / q), p) != BigInt::from(1) {
+            return g;
+        }
+    }
 }
 
 //  rpc.proto service
 #[tonic::async_trait]
 impl Zkp for ZkpServerI {
     async fn init_communication(&self,request:Request<ParamsRequest>)->Result<Response<ParamsResponse>,Status>{
-        let p = BigInt::from_str("0").unwrap().to_be_bytes();
-        let q = BigInt::from_str("0").unwrap().to_be_bytes();
-        let g = BigInt::from_str("0").unwrap().to_be_bytes();
-        let h = BigInt::from_str("0").unwrap().to_be_bytes();
-        
-        let response: ParamsResponse = ParamsResponse{
-            p,
-            q,
-            g,
-            h,
+        // We want to generate P which is a safe prime and q is a subgroup of p. 
+        // Safe means that p = 2q + 1, where p and q are both prime numbers
+        let p = generate_safe_prime(2048); // 2048 bits = 256 bytes - standard sha256 size 
+        let q = (&p - 1) / 2; // Sophie Germain prime
+
+        // Generators should be between 2 and p, and the generator g = 2^((p-1)/q) mod p should be different from 1
+        // generators are able to produce any other number in the group p and sub group q
+        let g = find_generator(&p, &q);
+        let h = find_generator(&p, &q);
+
+        let parameters = Parameters { p: p.clone(), q: q.clone(), g: g.clone(), h: h.clone() };
+        *self.parameters.lock().await = Some(parameters); // Save the parameters
+
+        // Prepare the response
+        let response = ParamsResponse {
+            p: p.to_bytes_be().1,
+            q: q.to_bytes_be().1,
+            g: g.to_bytes_be().1,
+            h: h.to_bytes_be().1,
         };
-        println!("response={:?}",response);
+
+        println!("response={:?}", response);
         Ok(Response::new(response))
     }
 
