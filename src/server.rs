@@ -96,20 +96,21 @@ impl Zkp for ZkpServerI {
             g: g.to_bytes_be().1,
             h: h.to_bytes_be().1,
         };
-        println!("response: {:?}", response);
 
         Ok(Response::new(response))
     }
 
     async fn register(&self, request:Request<RegisterRequest>) -> Result<Response<RegisterResponse>,Status>{
-        println!("[INFO] register={:?}",request);
+        println!("[INFO] register request...");
 
         let data = request.get_ref();
         let username = data.username.clone();
         // We could say that y1 and y2 are the public keys of the user
         let y1 = BigInt::from_bytes_be(Sign::Plus, &data.y1);
         let y2 = BigInt::from_bytes_be(Sign::Plus, &data.y2);
-        println!("[DEBUG] Registering user: {}, y1: {}, y2: {}", username, y1, y2);
+        println!("[DEBUG] username: {}, y1: {}", username, y1);
+        println!("[DEBUG] username: {}, y2: {}", username, y2);
+
 
         let user = User {
             id: username.clone(),
@@ -153,16 +154,14 @@ impl Zkp for ZkpServerI {
             c: c.to_bytes_be().1,
         };
     
-        println!("[DEBUG] Sending challenge response: {:?}", response);
         Ok(Response::new(response))    
     }
 
     async fn verify(&self, request:Request<SecretRequest>) -> Result<Response<SecretResponse>,Status>{
-
         let data = request.get_ref();
         let username = data.username.clone();
         let s = BigInt::from_bytes_be(Sign::Plus, &data.s);
-        println!("[INFOP] Received verification request, username: {}, s: {}", username, s);
+        println!("[INFO] Received verification request, username: {}, s: {}", username, s);
 
         let challenges = self.challenges.lock().await;
         let challenge = challenges.get(&username).ok_or(Status::not_found("Challenge not found"))?;
@@ -179,9 +178,10 @@ impl Zkp for ZkpServerI {
         let h = &parameters.as_ref().unwrap().h;
 
         // verifications for g annd h generators
-        let v1 = (g.modpow(&s, p) * user.y1.modpow(&challenge.c, p)) % p;
-        let v2 = (h.modpow(&s, p) * user.y2.modpow(&challenge.c, p)) % p;
-        println!("[DEBUG] Computed v1: {}, v2: {}", v1, v2);
+        let v1 = (g.modpow(&s, &p) * user.y1.modpow(&challenge.c, &p)) % p;
+        let v2 = (h.modpow(&s, &p) * user.y2.modpow(&challenge.c, &p)) % p;
+        println!("[DEBUG] Computed v1: {} and r1: {}", v1, challenge.r1);
+        println!("[DEBUG] Computed v2: {} and r2: {}", v2, challenge.r2);
 
         let session = if v1 == challenge.r1 && v2 == challenge.r2 {
             "valid_session_token".to_string() // This should be a random token or something

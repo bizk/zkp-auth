@@ -1,4 +1,5 @@
-use num_bigint::{BigInt, RandBigInt, Sign};
+use num_bigint::{BigInt, RandBigInt, Sign, ToBigInt};
+use num::abs;
 use rand::thread_rng;
 use std::error::Error;
 use tonic::transport::Channel;
@@ -48,7 +49,6 @@ impl ZkpClientWrapper {
         println!("[INFO] Requesting parameters from server...");
         let request = tonic::Request::new(ParamsRequest {});
         let response = self.client.init_communication(request).await?.into_inner();
-        println!("[DEBUG] Received parameters: {:?}", response);
 
         self.p = BigInt::from_bytes_be(Sign::Plus, &response.p);
         self.q = BigInt::from_bytes_be(Sign::Plus, &response.q);
@@ -67,7 +67,8 @@ impl ZkpClientWrapper {
         self.y1 = self.g.modpow(&self.x, &self.p);
         self.y2 = self.h.modpow(&self.x, &self.p);
 
-        println!("[DEBUG] Computed y1: {}, y2: {}", self.y1, self.y2);
+        println!("[DEBUG] y1: {}", self.y1.clone());
+        println!("[DEBUG] y2: {}", self.y2.clone());
         let request = tonic::Request::new(RegisterRequest {
             username: self.username.clone(),
             y1: self.y1.to_bytes_be().1,
@@ -98,15 +99,17 @@ impl ZkpClientWrapper {
         println!("[DEBUG] Sending challenge request...");
 
         let challenge_response = self.client.challenge(challenge_request).await?.into_inner();
-        println!("[DEBUG] Received challenge response: {:?}", challenge_response);
-
         // Compute the response
         let c = BigInt::from_bytes_be(Sign::Plus, &challenge_response.c);
-        let s = (k - c.clone() * self.x.clone()) % &self.q;
-        println!(
-            "[DEBUG] Computed response c: {}, s: {}",
-            c, s
-        );
+        let mut s = (&k - c.clone() * &self.x.clone()) % &self.q;
+        if s < 0.to_bigint().unwrap() {
+            s = s + &self.q;
+        }
+
+        println!("[DEBUG] - x: {}", self.x);
+        println!("[DEBUG] - k: {}", &k.clone().to_string());
+        println!( "[DEBUG] - c: {}",c);
+        println!( "[DEBUG] - s: {}",s);
 
         println!("[INFO] verifying proof...");
         // Send verification request
@@ -127,7 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("[MAIN] Starting client...");
     let addr = "http://[::1]:50051";
     let username = "testuser".to_string();
-    let secret = BigInt::from(1234); // This should be a securely generated secret in practice
+    let secret = BigInt::from(1234); // This should be a securely generated secret 
     println!("[MAIN] [DEBUG] Initialized parameters username: {} - secret: {}", username, secret);
 
     let mut client = ZkpClientWrapper::new(addr, username, secret).await?;
