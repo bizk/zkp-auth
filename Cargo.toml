@@ -25,9 +25,9 @@ version = "2.2.0"
 tonic-build = "0.9.2"
 
 [[bin]]
-name = "server"
+name = "zkp-server"
 path = "src/server.rs"
 
 [[bin]]
-name = "client"
+name = "zkp-client"
 path = "src/client.rs"

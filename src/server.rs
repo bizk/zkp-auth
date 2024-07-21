@@ -13,20 +13,17 @@ use rand::thread_rng;
 use num_bigint::{BigInt, BigUint, RandBigInt, Sign};
 use num_primes::Generator;
 
-use is_prime::is_prime;
 // use num_prime::nt_funcs::is_prime;
 
 
 #[derive(Clone)]
 struct User {
-    id: String,
     y1: BigInt,
     y2: BigInt,
 }
 
 #[derive(Clone)]
 struct Challenge {
-    id: String,
     r1: BigInt,
     r2: BigInt,
     c: BigInt,
@@ -113,13 +110,12 @@ impl Zkp for ZkpServerI {
 
 
         let user = User {
-            id: username.clone(),
             y1: y1.clone(),
             y2: y2.clone(),
         };
 
         let mut users = self.users.lock().await;
-        users.insert(username.clone(), user);
+        users.insert(username, user);
 
         Ok(Response::new(RegisterResponse::default()))
     }
@@ -138,7 +134,6 @@ impl Zkp for ZkpServerI {
         println!("[DEBUG] Generated random challenge c: {}", c);
 
         let challenge = Challenge {
-            id: username.clone(),
             r1: r1.clone(),
             r2: r2.clone(),
             c: c.clone(),
@@ -256,7 +251,7 @@ mod tests {
         let users = server.users.lock().await;
         assert!(users.contains_key("testuser"));
         let user = users.get("testuser").unwrap();
-        assert_eq!(user.id, "testuser");
+        assert_eq!(user.username, "testuser");
         assert_eq!(user.y1, BigInt::from(123));
         assert_eq!(user.y2, BigInt::from(456));
     }
@@ -283,7 +278,7 @@ mod tests {
         let challenges = server.challenges.lock().await;
         assert!(challenges.contains_key("testuser"));
         let challenge = challenges.get("testuser").unwrap();
-        assert_eq!(challenge.id, "testuser");
+        assert_eq!(challenge.username, "testuser");
         assert_eq!(challenge.r1, BigInt::from(789));
         assert_eq!(challenge.r2, BigInt::from(101112));
         assert_eq!(challenge.c, c);

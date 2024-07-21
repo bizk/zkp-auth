@@ -1,0 +1,14 @@
+FROM rust:bookworm as builder
+
+WORKDIR /usr/src/app
+RUN apt-get update \
+    && apt-get install -y protobuf-compiler libprotobuf-dev
+
+COPY . .
+RUN cargo build --release --bin zkp-server
+
+RUN ls
+COPY /target/release/zkp-server zkp-server
+
+EXPOSE 50051
+CMD ["zkp-server"]

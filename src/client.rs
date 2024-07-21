@@ -1,5 +1,4 @@
 use num_bigint::{BigInt, RandBigInt, Sign, ToBigInt};
-use num::abs;
 use rand::thread_rng;
 use std::error::Error;
 use tonic::transport::Channel;
@@ -102,7 +101,7 @@ impl ZkpClientWrapper {
         // Compute the response
         let c = BigInt::from_bytes_be(Sign::Plus, &challenge_response.c);
         let mut s = (&k - c.clone() * &self.x.clone()) % &self.q;
-        if s < 0.to_bigint().unwrap() {
+        if s < 0.to_bigint().unwrap() { // If the value is negative we want to convert it to a positive value otherwise the algorithm will fail 
             s = s + &self.q;
         }
 

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  zkp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "50051:50051"
+    networks:
+      - zkp-network
+
+  zkp-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    depends_on:
+      - zkp-server
+    networks:
+      - zkp-network
+
+networks:
+  zkp-network:
+    driver: bridge
