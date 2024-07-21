@@ -15,6 +15,7 @@ num-bigint = {version = "0.4.6", features = ["rand"]}
 num-traits = "0.2.19"
 num-prime = "0.4.4"
 is_prime = "2.0.9"
+num-primes = "0.3.0"
 
 [dependencies.mongodb]
 version = "2.2.0"

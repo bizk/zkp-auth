@@ -15,9 +15,9 @@ service Zkp {
 message ParamsRequest {}
 
 message ParamsResponse {
-  bytes g = 1;  
+  bytes p = 1;  
   bytes q = 2;
-  bytes p = 3;    
+  bytes g = 3;    
   bytes h = 4;
 }
 
